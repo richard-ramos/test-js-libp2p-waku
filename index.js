@@ -6,6 +6,7 @@ const Mplex = require("libp2p-mplex");
 const { NOISE } = require("libp2p-noise");
 const Gossipsub = require("libp2p-gossipsub");
 const PeerId = require("peer-id");
+const { SignaturePolicy } = require('libp2p-interfaces/src/pubsub/signature-policy');
 
 const topic = "/waku/2/default-waku/proto";
 const idJSON = {
@@ -17,13 +18,14 @@ const idJSON = {
 };
 
 
-
-//Gossipsub.multicodec = ("/vac/waku/relay/2.0.0-beta2")
-
 class Waku extends Gossipsub {
     constructor(libp2p, options){
+        options.globalSignaturePolicy = SignaturePolicy.StrictNoSign;
         super(libp2p, options);
-        this.multicodecs.push("/vac/waku/relay/2.0.0-beta2")
+        const m = this.multicodecs;
+        m.unshift("/vac/waku/relay/2.0.0-beta2");
+        Object.assign(this, { multicodecs: m });
+
     }
 }
 
@@ -54,7 +56,6 @@ const createBootstrapNode = (peerId, listenAddrs) => {
 (async () => {
   const peerId = await PeerId.createFromJSON(idJSON);
 
-  // Wildcard listen on TCP and Websocket
   const addrs = ["/ip4/0.0.0.0/tcp/63785"];
 
   // Create the node
@@ -65,11 +66,12 @@ const createBootstrapNode = (peerId, listenAddrs) => {
   console.log("Node started with addresses:");
   libp2p.transportManager
     .getAddrs()
-    .forEach((ma) => console.log(ma.toString()));
+    .forEach((ma) => console.log(ma.toString() + "/p2p/" + peerId.toB58String()));
   console.log("\nNode supports protocols:");
   libp2p.upgrader.protocols.forEach((_, p) => console.log(p));
 
   libp2p.pubsub.on(topic, function (message) {
+    console.log(message);
     console.log("\nReceived: ", message.data.toString("utf8"));
   });
   libp2p.pubsub.subscribe(topic);
